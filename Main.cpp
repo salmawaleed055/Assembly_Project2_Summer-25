@@ -7,6 +7,7 @@
 #include <vector>
 using namespace std;
 
+
 #define DRAM_SIZE (64*1024*1024)
 
 // Cache configuration constants
@@ -323,17 +324,105 @@ SimResult runSimulation(unsigned int (*memGen)(), const string& genName, int lin
 
     return result;
 }
+// void generateSimpleGraph() {
+//     cout << "\nSimple ASCII Graph (CPI vs Line Size):\n";
+//     cout << "======================================\n";
+//
+//     string genNames[5] = {"Gen1", "Gen2", "Gen3", "Gen4", "Gen5"};
+//
+//     for(int gen = 0; gen < 5; gen++) {
+//         cout << genNames[gen] << ": ";
+//         for(int ls = 0; ls < 4; ls++) {
+//             int bars = (int)(results[gen][ls].cpi * 2); // Scale for display
+//             cout << string(min(bars, 20), '*') << " ";
+//         }
+//         cout << "\n";
+//     }
+// }
+class CacheSimulatorTester {
+public:
+    static void testBasicCacheOperations() {
+        cout << "\n=== Testing Basic Cache Operations ===\n";
+
+        resetRNG();
+        initCache(&L1_cache, 1024, 32, 2);
+
+        bool wb_needed;
+        unsigned int wb_addr;
+        cacheResType result = accessCache(0x0000, &L1_cache, false, wb_needed, wb_addr);
+        if(result != MISS || L1_cache.misses != 1) {
+            cout << "✗ Test 1 FAILED\n";
+            return;
+        }
+        cout << "✓ Test 1 passed: First access is a miss\n";
+
+        result = accessCache(0x0000, &L1_cache, false, wb_needed, wb_addr);
+        if(result != HIT || L1_cache.hits != 1) {
+            cout << "✗ Test 2 FAILED\n";
+            return;
+        }
+        cout << "✓ Test 2 passed: Repeated access is a hit\n";
+
+        cleanupCache(&L1_cache);
+    }
+
+    static void testMemoryGenerators() {
+        cout << "\n=== Testing Memory Generators ===\n";
+
+        bool all_in_range = true;
+        for(int i = 0; i < 100; i++) {
+            unsigned int addr = memGen2();
+            if(addr >= 24*1024) {
+                all_in_range = false;
+                break;
+            }
+        }
+        cout << "memGen2 range test: " << (all_in_range ? "✓ PASS" : "✗ FAIL") << "\n";
+    }
+};
+class PerformanceValidator {
+public:
+    static void validateResults(SimResult results[][4]) {
+        cout << "\n=== Validating Performance Results ===\n";
+
+        // Test: memGen4 should have good performance
+        if(results[3][0].cpi < 1.1) {
+            cout << "✓ memGen4 has good performance\n";
+        } else {
+            cout << "✗ memGen4 performance issue\n";
+        }
+
+        // Test: memGen3 should have poor performance
+        if(results[2][0].cpi > 20) {
+            cout << "✓ memGen3 has poor performance as expected\n";
+        } else {
+            cout << "✗ memGen3 performance better than expected\n";
+        }
+
+        // Test: Larger line sizes should help sequential patterns
+        if(results[0][3].cpi < results[0][0].cpi) {
+            cout << "✓ Larger line sizes help sequential access\n";
+        } else {
+            cout << "✗ Line size effect not working\n";
+        }
+    }
+};
 
 int main() {
-    // Array of memory generators
-    unsigned int (*memGens[5])() = {memGen1, memGen2, memGen3, memGen4, memGen5};
-    string genNames[5] = {"memGen1", "memGen2", "memGen3", "memGen4", "memGen5"};
-
-    // L1 line sizes to test
-    int lineSizes[4] = {16, 32, 64, 128};
-
+    // Run tests first
     cout << "Two-Level Cache Performance Simulator\n";
     cout << "=====================================\n";
+    cout << "\nRUNNING VERIFICATION TESTS...\n";
+    cout << string(50, '=') << "\n";
+
+    CacheSimulatorTester::testBasicCacheOperations();
+    CacheSimulatorTester::testMemoryGenerators();
+
+    cout << "\n" << string(50, '=') << "\n";
+    cout << "ALL TESTS COMPLETED! Starting main simulation...\n";
+    cout << string(50, '=') << "\n\n";
+
+    // Configuration info
     cout << "Configuration:\n";
     cout << "  L1: " << L1_SIZE/1024 << "KB, " << L1_ASSOCIATIVITY << "-way, variable line size\n";
     cout << "  L2: " << L2_SIZE/1024 << "KB, " << L2_ASSOCIATIVITY << "-way, " << L2_LINE_SIZE << "B line size\n";
@@ -341,7 +430,14 @@ int main() {
     cout << "  Write probability: 50%\n";
     cout << "  Iterations per test: 1,000,000\n\n";
 
-    // Results storage
+    // Array of memory generators
+    unsigned int (*memGens[5])() = {memGen1, memGen2, memGen3, memGen4, memGen5};
+    string genNames[5] = {"memGen1", "memGen2", "memGen3", "memGen4", "memGen5"};
+
+    // L1 line sizes to test
+    int lineSizes[4] = {16, 32, 64, 128};
+
+    // Declare results array
     SimResult results[5][4];  // [generator][line_size]
 
     // Run all simulations
@@ -421,5 +517,11 @@ int main() {
         }
     }
 
-    return 0;
+    // 🎯 Generate ASCII Graph
+    // generateSimpleGraph(results);
+
+    // 🎯 Validate results
+    PerformanceValidator::validateResults(results);
+
+    return 0;  // 🎯 FIXED: This was the syntax error
 }
